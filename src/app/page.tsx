@@ -10,6 +10,7 @@ type QuestionGroup = {
 
 const QUESTIONS_PER_STAGE = 12;
 const TOTAL_QUESTIONS = 36;
+const SECRET_CODE = "gong";
 
 const groups: QuestionGroup[] = [
   {
@@ -76,6 +77,9 @@ export default function QuestionsTool() {
   const [preview, setPreview] = useState<string | null>(null);
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
   const [topN, setTopN] = useState(10);
+  const [secretInput, setSecretInput] = useState("");
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [secretError, setSecretError] = useState<string | null>(null);
 
   const questionNumberMap = useMemo(() => {
     return groups.reduce<Record<string, number>>((acc, group, gi) => {
@@ -150,6 +154,22 @@ export default function QuestionsTool() {
   const renderQuestionNumber = (question: string) => {
     const num = questionNumberMap[question];
     return typeof num === "number" ? `${num}. ` : "";
+  };
+
+  const handleUnlock = () => {
+    if (secretInput.trim().toLowerCase() === SECRET_CODE) {
+      setIsUnlocked(true);
+      setSecretInput("");
+      setSecretError(null);
+    } else {
+      setSecretError("口令不对，再试一次～");
+    }
+  };
+
+  const handleLock = () => {
+    setIsUnlocked(false);
+    setSecretInput("");
+    setSecretError(null);
   };
 
   return (
@@ -278,19 +298,27 @@ export default function QuestionsTool() {
           <h3 className="text-lg font-semibold text-slate-900">
             当前这一轮选中的问题（可复制发群里）
           </h3>
-          {selectedList.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-500">
-              这一轮还没有选择任何问题，点击上面的卡片即可勾选～
-            </p>
+          {isUnlocked ? (
+            <>
+              {selectedList.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  这一轮还没有选择任何问题，点击上面的卡片即可勾选～
+                </p>
+              ) : (
+                <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-800 md:text-base">
+                  {selectedList.map((question) => (
+                    <li key={question}>
+                      {renderQuestionNumber(question)}
+                      {question}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
           ) : (
-            <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-800 md:text-base">
-              {selectedList.map((question) => (
-                <li key={question}>
-                  {renderQuestionNumber(question)}
-                  {question}
-                </li>
-              ))}
-            </ol>
+            <p className="mt-2 text-sm text-slate-500">
+              该区域已隐藏，主持人输入口令后才会显示。
+            </p>
           )}
         </section>
 
@@ -303,41 +331,82 @@ export default function QuestionsTool() {
               · 用于选出当晚 Top N 深聊题目
             </span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-700">
-            <span>当晚 Top N =</span>
-            <input
-              type="number"
-              min={1}
-              max={TOTAL_QUESTIONS}
-              value={topN}
-              onChange={handleTopNChange}
-              className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-center"
-            />
-            <span className="text-xs text-slate-500">
-              （会按票数自动取前 N 个）
-            </span>
-          </div>
-          {stats.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              还没有任何记录。让每个人选完一轮后，点“记录这一轮选择”，这里就会显示最受欢迎的问题。
-            </p>
-          ) : (
-            <div>
-              <h4 className="text-sm font-semibold text-slate-900">
-                当晚 Top {Math.min(topN, stats.length)} 深聊题目
-              </h4>
-              <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-slate-800 md:text-base">
-                {topStats.map(([question, count]) => (
-                  <li key={question}>
-                    {renderQuestionNumber(question)}
-                    {question}{" "}
-                    <span className="text-xs text-slate-500">
-                      （{count} 票）
-                    </span>
-                  </li>
-                ))}
-              </ol>
+
+          {!isUnlocked ? (
+            <div className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm">
+              <p className="text-slate-600">
+                统计结果已上锁。主持人输入口令 <code className="rounded bg-slate-200 px-1">gong</code>{" "}
+                后即可查看。
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="password"
+                  value={secretInput}
+                  onChange={(event) => {
+                    setSecretInput(event.target.value);
+                    setSecretError(null);
+                  }}
+                  className="flex-1 min-w-[160px] rounded-lg border border-slate-300 px-3 py-1"
+                  placeholder="输入口令"
+                />
+                <button
+                  type="button"
+                  onClick={handleUnlock}
+                  className="rounded-xl bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  解锁
+                </button>
+              </div>
+              {secretError && (
+                <p className="text-sm text-rose-500">{secretError}</p>
+              )}
             </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                <span>当晚 Top N =</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={TOTAL_QUESTIONS}
+                  value={topN}
+                  onChange={handleTopNChange}
+                  className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-center"
+                />
+                <span className="text-xs text-slate-500">
+                  （会按票数自动取前 N 个）
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLock}
+                  className="ml-auto rounded-xl border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-100"
+                >
+                  重新上锁
+                </button>
+              </div>
+              {stats.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  还没有任何记录。让每个人选完一轮后，点“记录这一轮选择”，这里就会显示最受欢迎的问题。
+                </p>
+              ) : (
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">
+                    当晚 Top {Math.min(topN, stats.length)} 深聊题目
+                  </h4>
+                  <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-slate-800 md:text-base">
+                    {topStats.map(([question, count]) => (
+                      <li key={question}>
+                        {renderQuestionNumber(question)}
+                        {question}{" "}
+                        <span className="text-xs text-slate-500">
+                          （{count} 票）
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>
